@@ -5,33 +5,34 @@ on:
       CPU:
         description: "分支"
         required: true
-        default: 'sm7675'
+        default: 'sm8475'
       FEIL:
         description: "配置文件"
         required: true
-        default: 'oneplus_ace_3v_v'
+        default: 'oneplus_ace_pro_v'
       CPUD:
         description: "处理器代号"
         required: true
-        default: 'pineapple'
+        default: 'waipio'
       ANDROID_VERSION:
         description: "内核安卓版本"
         required: true
-        default: 'android14'
+        default: 'android12'
       KERNEL_VERSION:
         description: "内核版本"
         required: true
-        default: '6.1'
+        default: '5.10'
       KSUNEXT_ENABLED:
         description: "添加 KSU Next"
         required: true
         type: boolean
-        default: false
+        default: true
       SUSFS_ENABLED:
         description: "添加 SUSFS"
         required: true
         type: boolean
-        default: false
+        default: true
+
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -79,6 +80,12 @@ jobs:
          cd kernel_workspace/kernel_platform
          curl -LSs "https://raw.githubusercontent.com/rifsxd/KernelSU-Next/next/kernel/setup.sh" | bash -s next
          cd KernelSU-Next
+         
+         # 极客绝杀：时间穿透 (回退到 v3.1.0 破坏性更新之前的稳定提交)
+         COMMIT_HASH=$(git rev-list -n 1 --before="2026-03-01" HEAD)
+         git checkout $COMMIT_HASH
+         echo "🚨 已强行将 KernelSU-Next 锁死在稳定版本: $COMMIT_HASH"
+         
          KSU_VERSION=$(expr $(/usr/bin/git rev-list --count HEAD) "+" 10200)
          echo "KSUVER=$KSU_VERSION" >> $GITHUB_ENV
          sed -i "s/DKSU_VERSION=16/DKSU_VERSION=${KSU_VERSION}/" kernel/Makefile
@@ -98,6 +105,10 @@ jobs:
            # Apply patches
            cd ./KernelSU-Next
            patch -p1 --forward < 10_enable_susfs_for_ksu.patch || true
+           
+           # 强行注入缺失的 C 语言函数声明
+           sed -i '1i extern void ksu_syscall_hook_manager_init(void);\nextern void ksu_syscall_hook_manager_exit(void);' kernel/ksu.c
+           
            cd ../common
            patch -p1 < 50_add_susfs_in_gki-${{ github.event.inputs.ANDROID_VERSION }}-${{ github.event.inputs.KERNEL_VERSION }}.patch || true
            cp ../../kernel_patches/69_hide_stuff.patch ./
@@ -107,7 +118,7 @@ jobs:
            cd ./msm-kernel && git add -A && git commit -a -m "BUILD Kernel"
            cd ..
              
-           # 适配 TheWildJames 仓库的最新目录结构与命名规则 (针对 KSU Next)
+           # 恢复精准补丁定点打击
            cp ../kernel_patches/next/susfs_fix_patches/v1.5.12/fix_apk_sign.c.patch ./ || true
            patch -p1 -F 3 < fix_apk_sign.c.patch || true
               
@@ -126,7 +137,19 @@ jobs:
         run: |
          git clone https://github.com/Kernel-SU/AnyKernel3 --depth=1
          rm -rf ./AnyKernel3/.git
-         cp kernel_workspace/kernel_platform/out/msm-kernel-${{ github.event.inputs.CPUD }}-gki/dist/Image ./AnyKernel3/
+         
+         IMAGE_PATH=$(find kernel_workspace/kernel_platform/out/ -type f \( -name "Image" -o -name "Image.gz" -o -name "Image.lz4" -o -name "Image.gz-dtb" \) | head -n 1)
+         
+         if [ -z "$IMAGE_PATH" ]; then
+             echo "🚨 致命错误：连压缩版的内核都没找到！请检查 Build kernel 步骤日志。"
+             exit 1
+         fi
+         
+         echo "✅ 成功捕获内核镜像，路径为: $IMAGE_PATH"
+         cp "$IMAGE_PATH" ./AnyKernel3/
+         
+         # 备份一份，防止下一个步骤找不到
+         cp "$IMAGE_PATH" ./kernel_workspace/FINAL_IMAGE
 
       - name: Upload AnyKernel3
         uses: actions/upload-artifact@v4
@@ -138,4 +161,4 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
          name: Image_KernelSU_Next_${{ env.KSUVER }}_${{ github.event.inputs.FEIL }}
-         path: kernel_workspace/kernel_platform/out/msm-kernel-${{ github.event.inputs.CPUD }}-gki/dist/Image
+         path: ./kernel_workspace/FINAL_IMAGE
