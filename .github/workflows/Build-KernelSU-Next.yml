@@ -107,14 +107,15 @@ jobs:
            cd ./msm-kernel && git add -A && git commit -a -m "BUILD Kernel"
            cd ..
              
-           cp ../kernel_patches/apk_sign.c_fix.patch ./
-           patch -p1 -F 3 < apk_sign.c_fix.patch
-             
-           cp ../kernel_patches/core_hook.c_fix.patch ./
-           patch -p1 --fuzz=3 < ./core_hook.c_fix.patch
-           
-           cp ../kernel_patches/selinux.c_fix.patch ./
-           patch -p1 -F 3 < selinux.c_fix.patch
+           # 适配 TheWildJames 仓库的最新目录结构与命名规则 (针对 KSU Next)
+           cp ../kernel_patches/next/susfs_fix_patches/v1.5.12/fix_apk_sign.c.patch ./ || true
+           patch -p1 -F 3 < fix_apk_sign.c.patch || true
+              
+           cp ../kernel_patches/next/susfs_fix_patches/v1.5.12/fix_core_hook.c.patch ./ || true
+           patch -p1 --fuzz=3 < fix_core_hook.c.patch || true
+            
+           cp ../kernel_patches/next/susfs_fix_patches/v1.5.12/fix_selinux.c.patch ./ || true
+           patch -p1 -F 3 < fix_selinux.c.patch || true
            
       - name: Build kernel
         run: |
