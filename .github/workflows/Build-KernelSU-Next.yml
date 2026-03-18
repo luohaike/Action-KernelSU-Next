@@ -126,7 +126,9 @@ jobs:
         run: |
          git clone https://github.com/Kernel-SU/AnyKernel3 --depth=1
          rm -rf ./AnyKernel3/.git
-         cp kernel_workspace/kernel_platform/out/msm-kernel-${{ github.event.inputs.CPUD }}-gki/dist/Image ./AnyKernel3/
+         IMAGE_PATH=$(find kernel_workspace/kernel_platform/out/ -name "Image" -type f | head -n 1)
+         echo "搜寻到的内核镜像路径为: $IMAGE_PATH"
+         cp "$IMAGE_PATH" ./AnyKernel3/
 
       - name: Upload AnyKernel3
         uses: actions/upload-artifact@v4
