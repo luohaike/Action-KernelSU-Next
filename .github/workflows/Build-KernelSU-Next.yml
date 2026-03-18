@@ -98,7 +98,17 @@ jobs:
            # Apply patches
            cd ./KernelSU-Next
            patch -p1 --forward < 10_enable_susfs_for_ksu.patch || true
+           
            sed -i '1i extern void ksu_syscall_hook_manager_init(void);\nextern void ksu_syscall_hook_manager_exit(void);' kernel/ksu.c
+           echo "开始执行全量修复补丁覆盖..."
+           cp ../kernel_patches/next/susfs_fix_patches/v1.5.12/*.patch ./ || true
+           for patchfile in fix_*.patch; do
+               if [ -f "$patchfile" ]; then
+                   echo ">>> 正在打入修复补丁: $patchfile"
+                   patch -p1 --fuzz=3 < "$patchfile" || true
+               fi
+           done
+           
            cd ../common
            patch -p1 < 50_add_susfs_in_gki-${{ github.event.inputs.ANDROID_VERSION }}-${{ github.event.inputs.KERNEL_VERSION }}.patch || true
            cp ../../kernel_patches/69_hide_stuff.patch ./
