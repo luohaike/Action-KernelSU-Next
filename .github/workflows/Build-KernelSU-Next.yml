@@ -126,9 +126,31 @@ jobs:
         run: |
          git clone https://github.com/Kernel-SU/AnyKernel3 --depth=1
          rm -rf ./AnyKernel3/.git
-         IMAGE_PATH=$(find kernel_workspace/kernel_platform/out/ -name "Image" -type f | head -n 1)
-         echo "搜寻到的内核镜像路径为: $IMAGE_PATH"
+         
+         IMAGE_PATH=$(find kernel_workspace/kernel_platform/out/ -type f \( -name "Image" -o -name "Image.gz" -o -name "Image.lz4" -o -name "Image.gz-dtb" \) | head -n 1)
+         
+         if [ -z "$IMAGE_PATH" ]; then
+             echo "🚨 致命错误：连压缩版的内核都没找到！请检查 Build kernel 步骤日志。"
+             exit 1
+         fi
+         
+         echo "✅ 成功捕获内核镜像，路径为: $IMAGE_PATH"
          cp "$IMAGE_PATH" ./AnyKernel3/
+         
+         # 备份一份，防止下一个步骤找不到
+         cp "$IMAGE_PATH" ./kernel_workspace/FINAL_IMAGE
+
+      - name: Upload AnyKernel3
+        uses: actions/upload-artifact@v4
+        with:
+         name: AnyKernel3_KernelSU_Next_${{ env.KSUVER }}_${{ github.event.inputs.FEIL }}
+         path: ./AnyKernel3/*
+         
+      - name: Upload Image
+        uses: actions/upload-artifact@v4
+        with:
+         name: Image_KernelSU_Next_${{ env.KSUVER }}_${{ github.event.inputs.FEIL }}
+         path: ./kernel_workspace/FINAL_IMAGE
 
       - name: Upload AnyKernel3
         uses: actions/upload-artifact@v4
